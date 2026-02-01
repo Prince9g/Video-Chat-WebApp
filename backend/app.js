@@ -2,13 +2,13 @@ import { Server } from "socket.io";
 
 const io = new Server(8080, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: "*",
     methods: ["GET", "POST"],
   },
 });
 
 io.on("connection", (socket) => {
-  console.log("Socket connected:", socket.id);
+//   console.log("Socket connected:", socket.id);
 
   socket.on("join-room", ({ email, roomId }) => {
     socket.join(roomId);
