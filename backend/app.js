@@ -1,0 +1,45 @@
+import { Server } from "socket.io";
+
+const io = new Server(8080, {
+  cors: {
+    origin: "http://localhost:5173",
+    methods: ["GET", "POST"],
+  },
+});
+
+io.on("connection", (socket) => {
+  console.log("Socket connected:", socket.id);
+
+  socket.on("join-room", ({ email, roomId }) => {
+    socket.join(roomId);
+    socket.to(roomId).emit("user-joined", {
+      email,
+      id: socket.id,
+    });
+  });
+
+  socket.on("call-user", ({ to, offer }) => {
+    io.to(to).emit("call-made", {
+      from: socket.id,
+      offer,
+    });
+  });
+
+  socket.on("make-answer", ({ to, answer }) => {
+    io.to(to).emit("answer-made", {
+      from: socket.id,
+      answer,
+    });
+  });
+
+  socket.on("ice-candidate", ({ to, candidate }) => {
+    io.to(to).emit("ice-candidate", {
+      from: socket.id,
+      candidate,
+    });
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Socket disconnected:", socket.id);
+  });
+});
