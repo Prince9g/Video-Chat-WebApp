@@ -10,7 +10,9 @@ export const useSocket = () =>{
     return socket;
 }
 const SocketProvider = ({children}) => {
-    const socket = io('http://localhost:8080');
+    const socket = io('https://video-chat-webapp.onrender.com', {
+      transports: ['websocket'],
+    });
   return (
     <SocketContext.Provider value={socket}>
       {children}
