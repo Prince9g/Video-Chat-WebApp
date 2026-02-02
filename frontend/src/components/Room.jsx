@@ -1,16 +1,18 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useSocket } from "../context/SocketProvider";
 import Peer from "../service/Peer";
+import { useNavigate } from "react-router-dom";
 
 const Room = () => {
   const socket = useSocket();
+  const navigate = useNavigate();
 
   const [remoteSocketId, setRemoteSocketId] = useState(null);
   const [myStream, setMyStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
   const [isRemoteMain, setIsRemoteMain] = useState(true);
 
-  // ✅ SEPARATE refs (IMPORTANT)
+  // video refs
   const myMainRef = useRef(null);
   const myTileRef = useRef(null);
   const remoteMainRef = useRef(null);
@@ -20,7 +22,6 @@ const Room = () => {
 
   useEffect(() => {
     socket.on("user-joined", ({ id }) => {
-      // block 3rd user (frontend enforcement)
       if (remoteSocketId) {
         alert("Room already has 2 participants");
         return;
@@ -123,6 +124,29 @@ const Room = () => {
     await Peer.peer.addIceCandidate(new RTCIceCandidate(candidate));
   };
 
+  // ---------------- END CALL ----------------
+
+  const handleEndCall = () => {
+    if (myStream) myStream.getTracks().forEach((t) => t.stop());
+    if (remoteStream) remoteStream.getTracks().forEach((t) => t.stop());
+
+    Peer.peer.close();
+
+    Peer.peer = new RTCPeerConnection({
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:global.stun.twilio.com:3478" },
+      ],
+    });
+
+    setMyStream(null);
+    setRemoteStream(null);
+    setRemoteSocketId(null);
+    setIsRemoteMain(true);
+
+    navigate("/");
+  };
+
   // ---------------- UI HELPERS ----------------
 
   const swapVideos = () => {
@@ -133,22 +157,36 @@ const Room = () => {
 
   return (
     <div className="h-screen w-screen bg-black relative overflow-hidden">
+
+      {/* WAITING SCREEN */}
+      {!remoteSocketId && !myStream && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <h1 className="text-white text-2xl font-semibold">
+            Waiting for someone to join…
+          </h1>
+        </div>
+      )}
+
       {/* MAIN VIDEO */}
-      {isRemoteMain ? (
-        <video
-          ref={remoteMainRef}
-          autoPlay
-          playsInline
-          className="h-full w-full object-cover"
-        />
-      ) : (
-        <video
-          ref={myMainRef}
-          autoPlay
-          muted
-          playsInline
-          className="h-full w-full object-cover"
-        />
+      {(myStream || remoteStream) && (
+        <>
+          {isRemoteMain ? (
+            <video
+              ref={remoteMainRef}
+              autoPlay
+              playsInline
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <video
+              ref={myMainRef}
+              autoPlay
+              muted
+              playsInline
+              className="h-full w-full object-cover"
+            />
+          )}
+        </>
       )}
 
       {/* TILE VIDEO */}
@@ -178,12 +216,24 @@ const Room = () => {
 
       {/* START CALL BUTTON */}
       {remoteSocketId && !remoteStream && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
+        <div className="absolute inset-0 flex items-center justify-center">
           <button
             onClick={handleCallUser}
-            className="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-full text-white font-semibold"
+            className="px-8 py-4 bg-green-600 hover:bg-green-700 rounded-full text-white font-semibold text-lg"
           >
             Start Call
+          </button>
+        </div>
+      )}
+
+      {/* END CALL BUTTON */}
+      {(myStream || remoteStream) && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
+          <button
+            onClick={handleEndCall}
+            className="px-6 py-3 bg-red-600 hover:bg-red-700 rounded-full text-white font-semibold"
+          >
+            End Call
           </button>
         </div>
       )}
