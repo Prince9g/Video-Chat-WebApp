@@ -8,12 +8,11 @@ const io = new Server(8080, {
 });
 
 io.on("connection", (socket) => {
-//   console.log("Socket connected:", socket.id);
+  console.log("Socket connected:", socket.id);
 
-  socket.on("join-room", ({ email, roomId }) => {
+  socket.on("join-room", ({ roomId }) => {
     socket.join(roomId);
     socket.to(roomId).emit("user-joined", {
-      email,
       id: socket.id,
     });
   });
