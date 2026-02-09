@@ -11,10 +11,16 @@ io.on("connection", (socket) => {
   console.log("Socket connected:", socket.id);
 
   socket.on("join-room", ({ roomId }) => {
+    const room = io.sockets.adapter.rooms.get(roomId);
+    const usersInRoom = room ? room.size : 0;
+
+    if (usersInRoom >= 2) {
+      socket.emit("room-full");
+      return;
+    }
+
     socket.join(roomId);
-    socket.to(roomId).emit("user-joined", {
-      id: socket.id,
-    });
+    socket.to(roomId).emit("user-joined", { id: socket.id });
   });
 
   socket.on("call-user", ({ to, offer }) => {

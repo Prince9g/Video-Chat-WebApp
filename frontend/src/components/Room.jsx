@@ -1,16 +1,20 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useSocket } from "../context/SocketProvider";
 import Peer from "../service/Peer";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 const Room = () => {
   const socket = useSocket();
   const navigate = useNavigate();
+  const { roomId } = useParams();
 
   const [remoteSocketId, setRemoteSocketId] = useState(null);
   const [myStream, setMyStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
   const [isRemoteMain, setIsRemoteMain] = useState(true);
+
+  const [isCameraOn, setIsCameraOn] = useState(true);
+  const [isMicOn, setIsMicOn] = useState(true);
 
   const myMainRef = useRef(null);
   const myTileRef = useRef(null);
@@ -18,6 +22,12 @@ const Room = () => {
   const remoteTileRef = useRef(null);
 
   const iceQueue = useRef([]);
+
+  // ---------------- JOIN ROOM ----------------
+
+  useEffect(() => {
+    socket.emit("join-room", { roomId });
+  }, [socket, roomId]);
 
   // ---------------- PEER LISTENERS ----------------
 
@@ -34,10 +44,6 @@ const Room = () => {
           candidate: event.candidate,
         });
       }
-    };
-
-    Peer.peer.onconnectionstatechange = () => {
-      console.log("PC state:", Peer.peer.connectionState);
     };
   };
 
@@ -56,11 +62,17 @@ const Room = () => {
     socket.on("answer-made", handleAnswer);
     socket.on("ice-candidate", handleIceCandidate);
 
+    socket.on("room-full", () => {
+      alert("Room already has 2 participants");
+      navigate("/");
+    });
+
     return () => {
       socket.off("user-joined");
       socket.off("call-made");
       socket.off("answer-made");
       socket.off("ice-candidate");
+      socket.off("room-full");
     };
   }, [socket, remoteSocketId]);
 
@@ -68,15 +80,15 @@ const Room = () => {
 
   useEffect(() => {
     if (myStream) {
-      if (myMainRef.current) myMainRef.current.srcObject = myStream;
-      if (myTileRef.current) myTileRef.current.srcObject = myStream;
+      myMainRef.current.srcObject = myStream;
+      myTileRef.current.srcObject = myStream;
     }
   }, [myStream]);
 
   useEffect(() => {
     if (remoteStream) {
-      if (remoteMainRef.current) remoteMainRef.current.srcObject = remoteStream;
-      if (remoteTileRef.current) remoteTileRef.current.srcObject = remoteStream;
+      remoteMainRef.current.srcObject = remoteStream;
+      remoteTileRef.current.srcObject = remoteStream;
     }
   }, [remoteStream]);
 
@@ -138,6 +150,26 @@ const Room = () => {
     }
   };
 
+  // ---------------- CAMERA / MIC ----------------
+
+  const toggleCamera = () => {
+    if (!myStream) return;
+
+    myStream.getVideoTracks().forEach((track) => {
+      track.enabled = !track.enabled;
+      setIsCameraOn(track.enabled);
+    });
+  };
+
+  const toggleMic = () => {
+    if (!myStream) return;
+
+    myStream.getAudioTracks().forEach((track) => {
+      track.enabled = !track.enabled;
+      setIsMicOn(track.enabled);
+    });
+  };
+
   // ---------------- END CALL ----------------
 
   const handleEndCall = () => {
@@ -162,9 +194,7 @@ const Room = () => {
 
       {!remoteSocketId && !myStream && (
         <div className="absolute inset-0 flex items-center justify-center">
-          <h1 className="text-white text-2xl font-semibold">
-            Waiting for someone to join…
-          </h1>
+          <h1 className="text-white text-2xl">Waiting for someone to join…</h1>
         </div>
       )}
 
@@ -181,7 +211,7 @@ const Room = () => {
       {(myStream || remoteStream) && (
         <div
           onClick={() => setIsRemoteMain((p) => !p)}
-          className="absolute bottom-4 right-4 w-40 h-28 rounded-lg overflow-hidden border-2 border-white cursor-pointer"
+          className="absolute bottom-4 right-4 w-40 h-28 border-2 border-white cursor-pointer"
         >
           {isRemoteMain ? (
             <video ref={myTileRef} autoPlay muted playsInline className="h-full w-full object-cover" />
@@ -193,24 +223,36 @@ const Room = () => {
 
       {remoteSocketId && !remoteStream && (
         <div className="absolute inset-0 flex items-center justify-center">
-          <button
-            onClick={handleCallUser}
-            className="px-8 py-4 bg-green-600 rounded-full text-white font-semibold"
-          >
+          <button onClick={handleCallUser} className="px-8 py-4 bg-green-600 rounded-full text-white">
             Start Call
           </button>
         </div>
       )}
 
       {(myStream || remoteStream) && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
-          <button
-            onClick={handleEndCall}
-            className="px-6 py-3 bg-red-600 rounded-full text-white font-semibold"
-          >
-            End Call
-          </button>
-        </div>
+        <>
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex gap-4">
+            <button
+              onClick={toggleMic}
+              className={`px-4 py-3 rounded-full text-white ${isMicOn ? "bg-gray-700" : "bg-red-600"}`}
+            >
+              {isMicOn ? "Mute" : "Unmute"}
+            </button>
+
+            <button
+              onClick={toggleCamera}
+              className={`px-4 py-3 rounded-full text-white ${isCameraOn ? "bg-gray-700" : "bg-red-600"}`}
+            >
+              {isCameraOn ? "Camera Off" : "Camera On"}
+            </button>
+          </div>
+
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
+            <button onClick={handleEndCall} className="px-6 py-3 bg-red-600 rounded-full text-white">
+              End Call
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
